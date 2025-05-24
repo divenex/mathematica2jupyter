@@ -96,7 +96,7 @@ Mathematica2Jupyter[notebookPath]
 
 ## Screenshot
 
-![Image](https://i.sstatic.net/yrRsLjb0.png)
+![Image](https://i.sstatic.net/te5xlpyf.jpg)
 
 ## Inspiration
 
