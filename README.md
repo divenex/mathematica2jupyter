@@ -12,7 +12,7 @@ Converts Mathematica notebooks (.nb) to Jupyter Notebook format (.ipynb).
 
 ## Summary
 
-This `Mathematica2Jupyter` Wolfram Language package provides a function to convert Mathematica notebooks (`.nb` files) into Jupyter Notebook files (`.ipynb`). This allows for easier viewing and interaction with Mathematica notebook content within the Jupyter environment, leveraging its native notebook interface.
+This `Mathematica2Jupyter` Wolfram Language package provides a function to convert Mathematica notebooks (`.nb` files) into Jupyter Notebook files (`.ipynb`). This allows for easier viewing and interaction with Mathematica notebook content within the Jupyter environment, leveraging its native notebook interface. The resulting `.ipynb` files are meant to be used with the official [Wolfram Language kernel for Jupyter notebooks](https://github.com/WolframResearch/WolframLanguageForJupyter). 
 
 The conversion handles various cell types including:
 *   Input cells (Python code, assuming conversion from Wolfram Language)
