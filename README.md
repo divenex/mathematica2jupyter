@@ -94,10 +94,11 @@ Mathematica2Jupyter[notebookPath]
 *   Some complex or highly customized Mathematica notebook features might not be perfectly translated.
 *   The package includes a fix for a known `ExportString` bug that can affect the rendering of TeX fragments containing `$`.
 
+## Screenshot
+
+![Image](https://i.sstatic.net/yrRsLjb0.png)
+
 ## Inspiration
 
 This package is an minor adaptation of my similar package [Mathematica2VSCode](https://github.com/divenex/mathematica2vscode)
 
-## Screenshot
-
-![Image](https://i.sstatic.net/yrRsLjb0.png)
