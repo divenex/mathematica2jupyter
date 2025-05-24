@@ -97,3 +97,7 @@ Mathematica2Jupyter[notebookPath]
 ## Inspiration
 
 This package is an minor adaptation of my similar package [Mathematica2VSCode](https://github.com/divenex/mathematica2vscode)
+
+## Screenshot
+
+![Image](https://i.sstatic.net/yrRsLjb0.png)
