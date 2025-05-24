@@ -58,18 +58,25 @@ processInput[cnt_] := StringReplace[StringTake[
         {14, -2}], ", Null, " | (", Null" ~~ EndOfString) -> "\r\n"]
 
 processCell[style_, Cell[cnt_, ___]] :=
-    AssociationThread[{"cell_type", "source"} -> Switch[style,
+    AssociationThread[{"cell_type", "metadata", "source"} -> Switch[style,
         "DisplayFormula" | "DisplayFormulaNumbered", 
-                          {"markdown", StringReplace[processItem[cnt], "$" -> "$$"]},
-        "Input" | "Code", {"code",     processInput[cnt]},
-        _,                {"markdown", processText[cnt, style]}]]
+                          {"markdown", <||>, StringReplace[processItem[cnt], "$" -> "$$"]},
+        "Input" | "Code", {"code",     <||>, processInput[cnt]},
+        _,                {"markdown", <||>, processText[cnt, style]}]]
 
 mergeMarkdownCells[cells_] := SequenceReplace[cells,{c__?(#["cell_type"] === "markdown"&)} :> 
     <|c, "source" -> StringRiffle[Lookup[{c}, "source"], "\r\n\r\n"]|>]
                                                                           
 Mathematica2Jupyter[inputFile_?FileExistsQ] := Export[FileBaseName[inputFile] <> ".ipynb", 
     <|"cells" -> mergeMarkdownCells@NotebookImport[inputFile, 
-        Except["Output" | "Message"] -> (processCell[#1,#2]&)]|>, "JSON"]
+        Except["Output" | "Message"] -> (processCell[#1,#2]&)], 
+        "metadata" -> <|
+                "kernelspec" -> <|"display_name" -> "Wolfram Language", 
+                    "language" -> "wolfram", "name" -> "wolframlanguage"|>, 
+                "language_info" -> <| "version" -> "12.0+", "name" -> "wolfram",
+                    "pygments_lexer" -> "wolfram", "codemirror_mode" -> "mathematica",
+                    "mimetype" -> "application/vnd.wolfram.mathematica" |>
+            |>, "nbformat" -> 4, "nbformat_minor" -> 5|>, "JSON"]
 
 End[]
 
