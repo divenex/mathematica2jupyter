@@ -19,6 +19,23 @@ Mathematica2Jupyter::usage = "Mathematica2Jupyter[inputFile]
 
 Begin["`Private`"];
 
+prefix = <|"Title"               -> "# ",
+           "Section"             -> "---\n## ",
+           "Subsection"          -> "### ",
+           "Subsubsection"       -> "#### ",
+           "Subsubsubsection"    -> "##### ",
+           "Chapter"             -> "# ", 
+           "Subchapter"          -> "## ", 
+           "Item"                -> "-   ",
+           "ItemNumbered"        -> "1.  ",
+           "ItemParagraph"       -> "    ",    
+           "Subitem"             -> "    -   ", 
+           "SubitemNumbered"     -> "    1.  ",
+           "SubitemParagraph"    -> "        ",    
+           "Subsubitem"          -> "        -   ", 
+           "SubsubitemNumbered"  -> "        1.  ",
+           "SubsubitemParagraph" -> "            "|>
+    
 processItem[TextData[elems_]] := StringJoin[processItem /@ Flatten[{elems}]];  (* Recursive *)
 
 processItem[StyleBox[txt_String, "Input", ___]] := " `" <> StringTrim[txt] <> "` "
@@ -47,16 +64,17 @@ processItem[str_String] := str;
 
 processItem[unknown_] := (Print["Unrecognized form: " <> ToString[unknown]]; "---UNPARSED---")
 
-processText[cnt_, type_String] :=
-    Switch[type, "Title", "# ", "Section", "---\n## ", "Subsection", "### ", "Item", "- ", _, ""] <> 
-        StringReplace[processItem[cnt], "\n" -> "\r\n\r\n"]
+processText[cnt_, type_] := Lookup[prefix, type, ""] <> StringReplace[processItem[cnt], "\n" -> "\n\n"]
 
 processInput[_?(!FreeQ[#, _RasterBox]&)] := "---IMAGE---"
 
 processInput[cnt_] := StringReplace[StringTake[
     ToString[ToExpression[cnt, StandardForm, HoldComplete], InputForm], 
-        {14, -2}], ", Null, " | (", Null" ~~ EndOfString) -> "\r\n"]
+        {14, -2}], ", Null, " | (", Null" ~~ EndOfString) -> "\n"]
 
+mergeMarkdownCells[cells_] := SequenceReplace[cells,{c__?(#["cell_type"] === "markdown"&)} :> 
+    <|c, "source" -> StringRiffle[Lookup[{c}, "source"], "\n\n"]|>]
+                                                                          
 processCell[style_, Cell[cnt_, ___]] :=
     AssociationThread[{"cell_type", "metadata", "source"} -> Switch[style,
         "DisplayFormula" | "DisplayFormulaNumbered", 
@@ -64,19 +82,11 @@ processCell[style_, Cell[cnt_, ___]] :=
         "Input" | "Code", {"code",     <||>, processInput[cnt]},
         _,                {"markdown", <||>, processText[cnt, style]}]]
 
-mergeMarkdownCells[cells_] := SequenceReplace[cells,{c__?(#["cell_type"] === "markdown"&)} :> 
-    <|c, "source" -> StringRiffle[Lookup[{c}, "source"], "\r\n\r\n"]|>]
-                                                                          
 Mathematica2Jupyter[inputFile_?FileExistsQ] := Export[FileBaseName[inputFile] <> ".ipynb", 
     <|"cells" -> mergeMarkdownCells@NotebookImport[inputFile, 
-        Except["Output" | "Message"] -> (processCell[#1,#2]&)], 
-        "metadata" -> <|
-                "kernelspec" -> <|"display_name" -> "Wolfram Language", 
-                    "language" -> "wolfram", "name" -> "wolframlanguage"|>, 
-                "language_info" -> <| "version" -> "12.0+", "name" -> "wolfram",
-                    "pygments_lexer" -> "wolfram", "codemirror_mode" -> "mathematica",
-                    "mimetype" -> "application/vnd.wolfram.mathematica" |>
-            |>, "nbformat" -> 4, "nbformat_minor" -> 5|>, "JSON"]
+          Except["Output" | "Message"] -> (processCell[#1,#2]&)],   
+      "metadata" -> <|"language_info" -> <| "name" -> "wolfram", "pygments_lexer" -> "wolfram", 
+          "codemirror_mode" -> "mathematica","mimetype" -> "application/mathematica" |>|>|>, "JSON"]
 
 End[]
 
