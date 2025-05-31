@@ -4,16 +4,16 @@
 (* :Date: 2025-05-24 *)
 (* :Summary: Converts Mathematica notebooks (.nb) to Jupyter Notebook format (.ipynb) *)
 (* :Context: Mathematica2Jupyter` *)
-(* :Package Version: 1.0 *)
+(* :Package Version: 1.1 *)
 (* :Mathematica Version: 12.0+ *)
 (* :Copyright: (c) 2025 divenex (https://github.com/divenex) *)
 
 BeginPackage["Mathematica2Jupyter`"];
 
-Mathematica2Jupyter::usage = "Mathematica2Jupyter[inputFile] 
-    converts a Mathematica notebook (.nb) specified by inputFile to VSCode Notebook (.vsnb) format.
-    The output file is saved to the same location as the input file but with .vsnb extension.
-    Returns the path to the created .vsnb file upon success, or $Failed if conversion fails.";
+Mathematica2Jupyter::usage = "Mathematica2Jupyter[inputFile, format] 
+    converts a Mathematica notebook (.nb) to Jupyter (.ipynb) or VSCode (.wlnb/.wsnb) format.
+    format (optional): \"ipynb\" (default) or \"wlnb\"/\"vsnb\".
+    Returns the path to the created file upon success, or $Failed if conversion fails.";
 
 Begin["`Private`"];
 
@@ -74,21 +74,32 @@ processInput[cnt_] := StringReplace[StringTake[
     ToString[ToExpression[cnt, StandardForm, HoldComplete], InputForm], 
         {14, -2}], ", Null, " | (", Null" ~~ EndOfString) -> "\n"]
 
-processCell[style_, Cell[cnt_, ___]] :=
-    AssociationThread[{"cell_type", "metadata", "source"} -> Switch[style,
-        "DisplayFormula" | "DisplayFormulaNumbered", 
-                          {"markdown", <||>, StringReplace[processItem[cnt], "$" -> "$$"]},
-        "Input" | "Code", {"code",     <||>, processInput[cnt]},
-        _,                {"markdown", <||>, processText[cnt, style]}]]
+typeHead[fmt_] := If[fmt === "ipynb", "cell_type", "languageId"]
+contentHead[fmt_] := If[fmt === "ipynb", "source", "value"]
+codeType[fmt_] := If[fmt === "ipynb", "code", "wolfram"]
 
-mergeMarkdownCells[cells_] := SequenceReplace[cells,{c__?(#["cell_type"] === "markdown"&)} :> 
-    <|c, "source" -> StringRiffle[Lookup[{c}, "source"], "\n\n"]|>]
+processCell[style_, Cell[cnt_, ___], fmt_] :=
+    AssociationThread[{typeHead[fmt], "metadata", contentHead[fmt], "kind"} -> Switch[style,
+        "DisplayFormula" | "DisplayFormulaNumbered", 
+            {"markdown", <||>, StringReplace[processItem[cnt], "$" -> "$$"], 1},        
+        "Input" | "Code", {codeType[fmt], <||>, processInput[cnt], 2},
+        _, {"markdown", <||>, processText[cnt, style], 1}
+    ]]
+
+mergeMarkdownCells[cells_, fmt_] := 
+    SequenceReplace[cells, {c__?(#[typeHead[fmt]] === "markdown"&)} :> 
+        <|c, contentHead[fmt] -> StringRiffle[Lookup[{c}, contentHead[fmt]], "\n\n"]|>]
                                                                           
-Mathematica2Jupyter[inputFile_?FileExistsQ] := Export[FileBaseName[inputFile] <> ".ipynb", 
-    {"cells" -> mergeMarkdownCells@NotebookImport[inputFile, 
-          Except["Output" | "Message"] -> (processCell[#1,#2]&)],   
-     "metadata" -> {"language_info" -> {"name" -> "wolfram", "pygments_lexer" -> "wolfram", 
-          "codemirror_mode" -> "mathematica","mimetype" -> "application/mathematica"}}}, "JSON"]
+Mathematica2Jupyter[inputFile_?FileExistsQ, fmt_String:"ipynb"] := 
+    (cells = mergeMarkdownCells[NotebookImport[inputFile, 
+        Except["Output" | "Message"] -> (processCell[#1, #2, fmt]&)], fmt];
+     Export[FileBaseName[inputFile] <> "." <> fmt, 
+        If[fmt === "ipynb",
+            <|"cells" -> cells, "metadata" -> <|"language_info" -> <|"name" -> "wolfram", 
+                "pygments_lexer" -> "wolfram", "codemirror_mode" -> "mathematica", 
+                "mimetype" -> "application/mathematica"|>|>|>,
+            <|"cells" -> cells|>
+        ], "JSON"])
 
 End[]
 
