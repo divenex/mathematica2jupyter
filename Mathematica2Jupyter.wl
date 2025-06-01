@@ -2,7 +2,7 @@
 (* :Name: Mathematica2Jupyter *)
 (* :Author: https://github.com/divenex *)
 (* :Date: 2025-05-31 *)
-(* :Summary: Converts Mathematica notebooks (.nb) to Jupyter (.ipynb) or VSCode (.wlnb/.vsnb) format *)
+(* :Summary: Converts Mathematica notebooks (.nb) to Jupyter (.ipynb) or VS Code (.wlnb/.vsnb) format *)
 (* :Context: Mathematica2Jupyter` *)
 (* :Package Version: 1.1 *)
 (* :Mathematica Version: 12.0+ *)
@@ -11,7 +11,7 @@
 BeginPackage["Mathematica2Jupyter`"];
 
 Mathematica2Jupyter::usage = "Mathematica2Jupyter[inputFile, format] 
-    converts a Mathematica notebook (.nb) to Jupyter (.ipynb) or VSCode (.wlnb/.wsnb) format.
+    converts a Mathematica notebook (.nb) to Jupyter (.ipynb) or VS Code (.wlnb/.wsnb) format.
     format (optional): \"ipynb\" (default) or \"wlnb\"/\"vsnb\".
     Returns the path to the created file upon success, or $Failed if conversion fails.";
 
@@ -20,7 +20,7 @@ Begin["`Private`"];
 Mathematica2Jupyter::unparsed = "Unrecognized form encountered during conversion: `1`";
 
 prefix = <|"Title"               -> "# ",
-           "Subtitle"            -> "### ",
+           "Subtitle"            -> "## ",
            "Chapter"             -> "# ", 
            "Section"             -> "---\n## ",
            "Subsection"          -> "### ",
@@ -74,32 +74,27 @@ processInput[cnt_] := StringReplace[StringTake[
     ToString[ToExpression[cnt, StandardForm, HoldComplete], InputForm], 
         {14, -2}], ", Null, " | (", Null" ~~ EndOfString) -> "\n"]
 
-typeHead[fmt_] := If[fmt === "ipynb", "cell_type", "languageId"]
-contentHead[fmt_] := If[fmt === "ipynb", "source", "value"]
-codeType[fmt_] := If[fmt === "ipynb", "code", "wolfram"]
+typeKey[fmt_] := If[fmt === "ipynb", "cell_type", "languageId"]
+contentKey[fmt_] := If[fmt === "ipynb", "source", "value"]
+codeValue[fmt_] := If[fmt === "ipynb", "code", "wolfram"]
 
 processCell[style_, Cell[cnt_, ___], fmt_] :=
-    AssociationThread[{typeHead[fmt], "metadata", contentHead[fmt], "kind"} -> Switch[style,
+    AssociationThread[{typeKey[fmt], "metadata", contentKey[fmt], "kind"} -> Switch[style,
         "DisplayFormula" | "DisplayFormulaNumbered", 
             {"markdown", <||>, StringReplace[processItem[cnt], "$" -> "$$"], 1},        
-        "Input" | "Code", {codeType[fmt], <||>, processInput[cnt], 2},
-        _, {"markdown", <||>, processText[cnt, style], 1}
-    ]]
+        "Input" | "Code", {codeValue[fmt], <||>, processInput[cnt], 2},
+        _, {"markdown", <||>, processText[cnt, style], 1}]]
 
 mergeMarkdownCells[cells_, fmt_] := 
-    SequenceReplace[cells, {c__?(#[typeHead[fmt]] === "markdown"&)} :> 
-        <|c, contentHead[fmt] -> StringRiffle[Lookup[{c}, contentHead[fmt]], "\n\n"]|>]
+    SequenceReplace[cells, {c__?(#[typeKey[fmt]] === "markdown"&)} :> 
+        <|c, contentKey[fmt] -> StringRiffle[Lookup[{c}, contentKey[fmt]], "\n\n"]|>]
                                                                           
 Mathematica2Jupyter[inputFile_?FileExistsQ, fmt_String:"ipynb"] := 
-    (cells = mergeMarkdownCells[NotebookImport[inputFile, 
-        Except["Output" | "Message"] -> (processCell[#1, #2, fmt]&)], fmt];
-     Export[FileBaseName[inputFile] <> "." <> fmt, 
-        If[fmt === "ipynb",
-            <|"cells" -> cells, "metadata" -> <|"language_info" -> <|"name" -> "wolfram", 
-                "pygments_lexer" -> "wolfram", "codemirror_mode" -> "mathematica", 
-                "mimetype" -> "application/mathematica"|>|>|>,
-            <|"cells" -> cells|>
-        ], "JSON"])
+    Export[FileBaseName[inputFile] <> "." <> fmt, 
+        {"cells" -> mergeMarkdownCells[NotebookImport[inputFile, 
+            Except["Output" | "Message"] -> (processCell[#1,#2, fmt]&)], fmt],   
+        "metadata" -> {"language_info" -> {"name" -> "wolfram", "pygments_lexer" -> "wolfram", 
+            "codemirror_mode" -> "mathematica","mimetype" -> "application/mathematica"}}}, "JSON"]
 
 End[]
 
