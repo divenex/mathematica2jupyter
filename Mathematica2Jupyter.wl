@@ -1,12 +1,14 @@
 (* ::Package:: *)
 (* :Name: Mathematica2Jupyter *)
 (* :Author: https://github.com/divenex *)
-(* :Date: 2025-05-31 *)
+(* :Date: 2025-06-04 *)
 (* :Summary: Converts Mathematica notebooks (.nb) to Jupyter (.ipynb) or VS Code (.wlnb/.vsnb) format *)
 (* :Context: Mathematica2Jupyter` *)
-(* :Package Version: 1.1 *)
+(* :Package Version: 1.1.1 *)
 (* :Mathematica Version: 12.0+ *)
 (* :Copyright: (c) 2025 divenex (https://github.com/divenex) *)
+
+ClearAll["Mathematica2Jupyter`*", "Mathematica2Jupyter`Private`*"]  (* Clean everything upon reloading *)
 
 BeginPackage["Mathematica2Jupyter`"];
 
@@ -48,10 +50,7 @@ processItem[fmt_StyleBox] := ExportString[fmt, "HTMLFragment"]
 processItem[ButtonBox[txt_String, ___, ButtonData->{___, URL[url_String], ___}, ___]] := 
     " [" <> txt <> "](" <> url <> ") "
 
-processItem[expr_?(!FreeQ[#, _RasterBox]&)] := 
-    ExportString[Image[First[
-        Cases[expr, RasterBox[CompressedData[data__String], ___] :> Uncompress[data], Infinity]
-    ], ColorSpace -> "RGB"], "HTMLFragment"]
+processItem[item_?(!FreeQ[#, _GraphicsBox]&)] := ExportString[Rasterize[item], "HTMLFragment"]
 
 cond = (StringContainsQ[#, "$"] && StringFreeQ[#, {"{", "}"}])&
 
@@ -68,7 +67,7 @@ processItem[unknown_] := (Message[Mathematica2Jupyter::unparsed, unknown]; "---U
 
 processText[cnt_, type_] := Lookup[prefix, type, ""] <> StringReplace[processItem[cnt], "\n" -> "\n\n"]
 
-processInput[_?(!FreeQ[#, _RasterBox]&)] := "---IMAGE---"
+processInput[_?(!FreeQ[#, _GraphicsBox]&)] := "---IMAGE---"
 
 processInput[cnt_] := StringReplace[StringTake[
     ToString[ToExpression[cnt, StandardForm, HoldComplete], InputForm], 
@@ -79,22 +78,22 @@ contentKey[fmt_] := If[fmt === "ipynb", "source", "value"]
 codeValue[fmt_] := If[fmt === "ipynb", "code", "wolfram"]
 
 processCell[style_, Cell[cnt_, ___], fmt_] :=
-    AssociationThread[{typeKey[fmt], "metadata", contentKey[fmt], "kind"} -> Switch[style,
+    AssociationThread[{"kind", "metadata", typeKey[fmt], contentKey[fmt]} -> Switch[style,
         "DisplayFormula" | "DisplayFormulaNumbered", 
-            {"markdown", <||>, StringReplace[processItem[cnt], "$" -> "$$"], 1},        
-        "Input" | "Code", {codeValue[fmt], <||>, processInput[cnt], 2},
-        _, {"markdown", <||>, processText[cnt, style], 1}]]
+                          {1, <||>, "markdown",     StringReplace[processItem[cnt], "$" -> "$$"]},
+        "Input" | "Code", {2, <||>, codeValue[fmt], processInput[cnt]},
+        _,                {1, <||>, "markdown",     processText[cnt, style]}]]
 
 mergeMarkdownCells[cells_, fmt_] := 
     SequenceReplace[cells, {c__?(#[typeKey[fmt]] === "markdown"&)} :> 
         <|c, contentKey[fmt] -> StringRiffle[Lookup[{c}, contentKey[fmt]], "\n\n"]|>]
                                                                           
 Mathematica2Jupyter[inputFile_?FileExistsQ, fmt_String:"ipynb"] := 
-    Export[FileBaseName[inputFile] <> "." <> fmt, 
+    Export[FileBaseName[inputFile] <> "." <> fmt,        
         {"cells" -> mergeMarkdownCells[NotebookImport[inputFile, 
-            Except["Output" | "Message"] -> (processCell[#1,#2, fmt]&)], fmt],   
-        "metadata" -> {"language_info" -> {"name" -> "wolfram", "pygments_lexer" -> "wolfram", 
-            "codemirror_mode" -> "mathematica","mimetype" -> "application/mathematica"}}}, "JSON"]
+            Except["Output" | "Message"] -> (processCell[#1,#2, fmt]&)], fmt],          
+        "metadata" -> {"language_info" -> {"name" -> "wolfram", "codemirror_mode" -> "mathematica", 
+            "pygments_lexer" -> "wolfram", "mimetype" -> "application/vnd.wolfram.mathematica"}}}, "JSON"]
 
 End[]
 
